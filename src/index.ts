@@ -4,6 +4,8 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { walletCreate, walletBalance, walletInfo, walletFund, walletCreateBuyer } from './commands/wallet';
 import { serveCommand } from './commands/serve';
+import { historyCommand } from './commands/history';
+import { proxyCommand } from './commands/proxy';
 import { payCommand } from './commands/pay';
 
 const program = new Command();
@@ -74,6 +76,23 @@ ${chalk.bold('Examples:')}
 `);
 
 // ─── pay command ──────────────────────────────────────────────────────────────
+program
+  .command('history')
+  .description('Show payment history received by your wallet')
+  .option('-l, --limit <n>', 'Number of payments to show', '10')
+  .action((opts) => historyCommand(opts));
+
+program
+  .command('proxy')
+  .description('Put any HTTP API behind an x402 paywall')
+  .requiredOption('--target <url>', 'Target API URL to proxy')
+  .option('--price <amount>', 'Price per request in STX', '0.01')
+  .option('--token <token>', 'Token to accept (STX)', 'STX')
+  .option('--port <port>', 'Local port to listen on', '4000')
+  .option('--path <path>', 'Proxy endpoint path', '/proxy')
+  .option('--description <desc>', 'Service description')
+  .action((opts) => proxyCommand(opts));
+  
 program
   .command('pay')
   .description('Call an x402 endpoint and auto-pay with STX')

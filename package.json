@@ -1,0 +1,33 @@
+{
+  "name": "stackspay",
+  "version": "1.0.0",
+  "description": "Monetize any CLI script with x402-stacks payments on Bitcoin/Stacks",
+  "main": "dist/index.js",
+  "bin": {
+    "stackspay": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["stacks", "x402", "bitcoin", "micropayments", "cli", "sBTC", "STX"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.13.5",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "dotenv": "^17.3.1",
+    "express": "^4.22.1",
+    "ora": "^9.3.0",
+    "x402-stacks": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.2.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

@@ -7,6 +7,9 @@ import { serveCommand } from './commands/serve';
 import { historyCommand } from './commands/history';
 import { proxyCommand } from './commands/proxy';
 import { payCommand } from './commands/pay';
+import { watchCommand } from './commands/watch';
+import { requestCommand } from './commands/request';
+import { splitCommand } from './commands/split';
 
 const program = new Command();
 
@@ -92,6 +95,32 @@ program
   .option('--path <path>', 'Proxy endpoint path', '/proxy')
   .option('--description <desc>', 'Service description')
   .action((opts) => proxyCommand(opts));
+
+program
+  .command('watch')
+  .description('Live dashboard — monitor incoming payments in real-time')
+  .action(() => watchCommand());
+
+program
+  .command('request')
+  .description('Generate a payment request page with QR code')
+  .option('--price <amount>', 'Amount to request in STX', '0.01')
+  .option('--token <token>', 'Token (STX)', 'STX')
+  .option('--port <port>', 'Port for payment page', '5000')
+  .option('--description <desc>', 'Payment description')
+  .option('--save <file>', 'Save payment page as HTML file')
+  .action((opts) => requestCommand(opts));
+
+program
+  .command('split')
+  .description('Serve a command with automatic revenue splitting')
+  .requiredOption('--cmd <command>', 'Command to execute')
+  .requiredOption('--price <amount>', 'Total price in STX')
+  .option('--token <token>', 'Token (STX)', 'STX')
+  .option('--port <port>', 'Port to listen on', '3000')
+  .option('--split <address:pct>', 'Split recipient (ADDRESS:PERCENTAGE)', (val, acc: string[]) => [...acc, val], [])
+  .option('--description <desc>', 'Service description')
+  .action((opts) => splitCommand(opts));
   
 program
   .command('pay')

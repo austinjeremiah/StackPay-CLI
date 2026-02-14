@@ -696,7 +696,7 @@ node dist/index.js serve --cmd "echo test" --price 0.001 --token STX
 
 ---
 
-## Why stackspay Wins the x402 Stacks Challenge
+## Why stackspay
 
 | Challenge Goal | stackspay |
 |---|---|
@@ -710,7 +710,6 @@ node dist/index.js serve --cmd "echo test" --price 0.001 --token STX
 | Multi-party splits | Atomic revenue distribution in a single payment flow |
 | sBTC support | Real Bitcoin-denominated payments via SIP-010 |
 
-While other submissions build web apps, stackspay opens up an entirely new surface area — the terminal. Every developer already lives in the terminal. stackspay turns their existing tools into Bitcoin-powered paid services with a single command.
 
 ---
 

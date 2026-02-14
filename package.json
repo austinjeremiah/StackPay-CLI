@@ -1,10 +1,10 @@
 {
-  "name": "stackspay",
+  "name": "@austinjeremiah/stackspay",
   "version": "1.0.0",
   "description": "Monetize any CLI script with x402-stacks in 30 seconds. Powered by Bitcoin.",
   "main": "dist/index.js",
   "bin": {
-    "stackspay": "./dist/index.js"
+    "stackspay": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -31,7 +31,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/austinjeremiah/StackPay-CLI"
+    "url": "git+https://github.com/austinjeremiah/StackPay-CLI.git"
   },
   "bugs": {
     "url": "https://github.com/austinjeremiah/StackPay-CLI/issues"

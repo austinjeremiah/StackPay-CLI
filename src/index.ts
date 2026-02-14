@@ -30,7 +30,7 @@ program
   .version('1.0.0')
   .addHelpText('beforeAll', BANNER);
 
-// ─── wallet command group ────────────────────────────────────────────────────
+// ─── wallet ──────────────────────────────────────────────────────────────────
 const wallet = program
   .command('wallet')
   .description('Manage your Stacks wallet');
@@ -49,20 +49,21 @@ wallet
 
 wallet
   .command('info')
-  .description('Show wallet details and explorer link')
+  .description('Show wallet details, BNS name, and explorer link')
   .action(() => walletInfo());
 
 wallet
   .command('fund')
   .description('Request testnet STX from faucet')
   .action(() => walletFund());
+
 wallet
   .command('create-buyer')
   .description('Create a separate buyer wallet for paying services')
   .option('-f, --force', 'Overwrite existing buyer wallet')
   .action((opts) => walletCreateBuyer(opts));
 
-// ─── serve command ────────────────────────────────────────────────────────────
+// ─── serve ───────────────────────────────────────────────────────────────────
 program
   .command('serve')
   .description('Wrap any command behind an x402 paywall')
@@ -71,34 +72,45 @@ program
   .option('-t, --token <token>', 'Token type: STX or SBTC', 'STX')
   .option('--port <port>', 'Port to listen on', '3000')
   .option('-d, --description <text>', 'Service description')
+  .option('--receiver <name>', 'Receive to BNS name (e.g. muneeb.id) or address')
   .action((opts) => serveCommand(opts))
   .addHelpText('after', `
 ${chalk.bold('Examples:')}
-  ${chalk.cyan('$ stackspay serve --cmd "python3 summarize.py" --price 0.001 --token STX')}
-  ${chalk.cyan('$ stackspay serve --cmd "node analyze.js" --price 0.005 --token STX --port 4000')}
-  ${chalk.cyan('$ stackspay serve --cmd "bash process.sh" --price 0.0001 --token SBTC')}
+  ${chalk.cyan('$ stackspay serve --cmd "python3 summarize.py" --price 0.001')}
+  ${chalk.cyan('$ stackspay serve --cmd "echo hello" --price 0.001 --receiver muneeb.id')}
+  ${chalk.cyan('$ stackspay serve --cmd "node analyze.js" --price 0.005 --port 4000')}
 `);
 
-// ─── pay command ──────────────────────────────────────────────────────────────
+// ─── pay ─────────────────────────────────────────────────────────────────────
+program
+  .command('pay')
+  .description('Call an x402 endpoint and auto-pay with STX')
+  .argument('<url>', 'x402 endpoint URL')
+  .option('-d, --data <json>', 'JSON data to send as request body')
+  .option('-f, --file <path>', 'Send file contents as request body')
+  .option('-r, --raw', 'Print raw response without formatting')
+  .action((url, opts) => payCommand(url, opts))
+  .addHelpText('after', `
+${chalk.bold('Examples:')}
+  ${chalk.cyan('$ stackspay pay http://localhost:3000/run')}
+  ${chalk.cyan('$ stackspay pay http://localhost:3000/run --data \'{"text": "hello"}\'')}
+  ${chalk.cyan('$ stackspay pay http://localhost:3000/run --file ./doc.txt')}
+`);
+
+// ─── history ─────────────────────────────────────────────────────────────────
 program
   .command('history')
   .description('Show payment history received by your wallet')
   .option('-l, --limit <n>', 'Number of payments to show', '10')
   .action((opts) => historyCommand(opts));
 
+// ─── watch ───────────────────────────────────────────────────────────────────
 program
-  .command('vault')
-  .description('Programmable payment vault — split, lock, and reserve earnings automatically')
-  .requiredOption('--cmd <command>', 'Command to execute on payment')
-  .requiredOption('--price <amount>', 'Price per call in STX')
-  .option('--token <token>', 'Token to accept (STX)', 'STX')
-  .option('--port <port>', 'Port to listen on', '3000')
-  .option('--split <address:pct>', 'Split % to address (ADDRESS:PERCENTAGE)', (v, acc: string[]) => [...acc, v], [])
-  .option('--lock <duration>', 'Lock % of earnings for duration (e.g. 7d, 24h, 30m)')
-  .option('--reserve <percentage>', 'Reserve % of earnings in wallet')
-  .option('--description <desc>', 'Service description')
-  .action((opts) => vaultCommand(opts));
+  .command('watch')
+  .description('Live dashboard — monitor incoming payments in real-time')
+  .action(() => watchCommand());
 
+// ─── proxy ───────────────────────────────────────────────────────────────────
 program
   .command('proxy')
   .description('Put any HTTP API behind an x402 paywall')
@@ -110,11 +122,7 @@ program
   .option('--description <desc>', 'Service description')
   .action((opts) => proxyCommand(opts));
 
-program
-  .command('watch')
-  .description('Live dashboard — monitor incoming payments in real-time')
-  .action(() => watchCommand());
-
+// ─── request ─────────────────────────────────────────────────────────────────
 program
   .command('request')
   .description('Generate a payment request page with QR code')
@@ -125,31 +133,38 @@ program
   .option('--save <file>', 'Save payment page as HTML file')
   .action((opts) => requestCommand(opts));
 
+// ─── split ───────────────────────────────────────────────────────────────────
 program
   .command('split')
-  .description('Serve a command with automatic revenue splitting')
+  .description('Serve a command with automatic revenue splitting (supports BNS names)')
   .requiredOption('--cmd <command>', 'Command to execute')
   .requiredOption('--price <amount>', 'Total price in STX')
   .option('--token <token>', 'Token (STX)', 'STX')
   .option('--port <port>', 'Port to listen on', '3000')
-  .option('--split <address:pct>', 'Split recipient (ADDRESS:PERCENTAGE)', (val, acc: string[]) => [...acc, val], [])
+  .option('--split <address:pct>', 'Split recipient — ADDRESS:PCT or name.btc:PCT', (val, acc: string[]) => [...acc, val], [])
   .option('--description <desc>', 'Service description')
-  .action((opts) => splitCommand(opts));
-  
-program
-  .command('pay')
-  .description('Call an x402 endpoint and auto-pay with STX')
-  .argument('<url>', 'x402 endpoint URL (e.g. http://localhost:3000/run)')
-  .option('-d, --data <json>', 'JSON data to send as request body')
-  .option('-f, --file <path>', 'Send file contents as request body')
-  .option('-r, --raw', 'Print raw response without formatting')
-  .action((url, opts) => payCommand(url, opts))
+  .action((opts) => splitCommand(opts))
   .addHelpText('after', `
 ${chalk.bold('Examples:')}
-  ${chalk.cyan('$ stackspay pay http://localhost:3000/run')}
-  ${chalk.cyan('$ stackspay pay http://localhost:3000/run --data \'{"text": "hello world"}\'')}
-  ${chalk.cyan('$ stackspay pay http://localhost:3000/run --file ./document.txt')}
-  ${chalk.cyan('$ stackspay pay http://api.example.com/premium --raw')}
+  ${chalk.cyan('$ stackspay split --cmd "echo hi" --price 0.002 --split muneeb.id:50 --split ST2ABC:50')}
+`);
+
+// ─── vault ───────────────────────────────────────────────────────────────────
+program
+  .command('vault')
+  .description('Programmable payment vault — split, lock, and reserve earnings (supports BNS)')
+  .requiredOption('--cmd <command>', 'Command to execute on payment')
+  .requiredOption('--price <amount>', 'Price per call in STX')
+  .option('--token <token>', 'Token to accept (STX)', 'STX')
+  .option('--port <port>', 'Port to listen on', '3000')
+  .option('--split <name:pct>', 'Split to BNS name or address (name.btc:PCT)', (v, acc: string[]) => [...acc, v], [])
+  .option('--lock <duration>', 'Lock % of earnings (e.g. 7d, 24h, 30m)')
+  .option('--reserve <percentage>', 'Reserve % of earnings')
+  .option('--description <desc>', 'Service description')
+  .action((opts) => vaultCommand(opts))
+  .addHelpText('after', `
+${chalk.bold('Examples:')}
+  ${chalk.cyan('$ stackspay vault --cmd "echo hi" --price 0.003 --split muneeb.id:30 --reserve 10 --lock 1h')}
 `);
 
 // ─── fallback ─────────────────────────────────────────────────────────────────
@@ -172,4 +187,4 @@ if (process.argv.length < 3) {
   console.log(chalk.cyan('    stackspay pay http://localhost:3000/run'));
   console.log('');
   program.outputHelp();
-}
+} 

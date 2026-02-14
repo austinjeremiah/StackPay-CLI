@@ -1,7 +1,7 @@
 {
   "name": "stackspay",
   "version": "1.0.0",
-  "description": "Monetize any CLI script with x402-stacks payments on Bitcoin/Stacks",
+  "description": "Monetize any CLI script with x402-stacks in 30 seconds. Powered by Bitcoin.",
   "main": "dist/index.js",
   "bin": {
     "stackspay": "./dist/index.js"
@@ -12,10 +12,42 @@
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["stacks", "x402", "bitcoin", "micropayments", "cli", "sBTC", "STX"],
-  "author": "",
+  "keywords": [
+    "stacks",
+    "x402",
+    "bitcoin",
+    "micropayments",
+    "cli",
+    "sBTC",
+    "STX",
+    "BNS",
+    "blockchain",
+    "web3",
+    "payments",
+    "monetize",
+    "developer-tools"
+  ],
+  "author": "Austin Jeremiah <austinjeremiah@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/austinjeremiah/StackPay-CLI"
+  },
+  "bugs": {
+    "url": "https://github.com/austinjeremiah/StackPay-CLI/issues"
+  },
+  "homepage": "https://github.com/austinjeremiah/StackPay-CLI#readme",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
+    "@stacks/network": "^6.17.0",
+    "@stacks/transactions": "^6.17.0",
     "axios": "^1.13.5",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",

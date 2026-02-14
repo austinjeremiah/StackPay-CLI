@@ -8,6 +8,7 @@ import os from 'os';
 import { paymentMiddleware, getPayment, STXtoMicroSTX, formatPaymentAmount } from 'x402-stacks';
 import { loadWallet } from '../utils/wallet';
 import { startLocalFacilitator } from '../utils/facilitator';
+import { resolveBNS } from '../utils/bns';
 
 const FACILITATOR_PORT = 8088;
 const FACILITATOR_URL = `http://localhost:${FACILITATOR_PORT}`;
@@ -16,9 +17,10 @@ const VAULT_FILE = path.join(os.homedir(), '.stackspay', 'vault.json');
 interface VaultRule {
   type: 'split' | 'lock' | 'reserve';
   address?: string;
+  name?: string;        // ← FIXED: added name here
   percentage: number;
-  unlockBlock?: number; // for lock
-  unlockDate?: string;  // human readable
+  unlockBlock?: number;
+  unlockDate?: string;
 }
 
 interface VaultState {
@@ -65,13 +67,11 @@ async function fetchCurrentBlock(host: string): Promise<number> {
 }
 
 function parseDuration(duration: string): number {
-  // Convert duration to approximate Stacks blocks
-  // Stacks produces ~1 block per Bitcoin block (~10 mins)
   const match = duration.match(/^(\d+)(m|h|d|w)$/);
-  if (!match) throw new Error(`Invalid duration: "${duration}" — use format like 1h, 7d, 2w`);
+  if (!match) throw new Error(`Invalid duration: "${duration}" — use 1h, 7d, 2w`);
   const value = parseInt(match[1]);
   const unit = match[2];
-  const blocksPerMin = 0.1; // ~1 block per 10 mins
+  const blocksPerMin = 0.1;
   switch (unit) {
     case 'm': return Math.ceil(value * blocksPerMin);
     case 'h': return Math.ceil(value * 60 * blocksPerMin);
@@ -94,7 +94,6 @@ function sendSTX(
       const stacksNetwork = network === 'mainnet'
         ? new (require('@stacks/network').StacksMainnet)()
         : new (require('@stacks/network').StacksTestnet)();
-
       const tx = await makeSTXTokenTransfer({
         recipient: toAddress,
         amount: microSTX,
@@ -103,13 +102,10 @@ function sendSTX(
         memo: memo.substring(0, 34),
         anchorMode: AnchorMode.Any,
       });
-
       const result = await broadcastTransaction(tx, stacksNetwork);
       if (result.error) reject(new Error(result.error));
       else resolve(result.txid || result);
-    } catch (e: any) {
-      reject(e);
-    }
+    } catch (e: any) { reject(e); }
   });
 }
 
@@ -137,20 +133,34 @@ export async function vaultCommand(options: {
   const totalAmount = STXtoMicroSTX(priceFloat);
   const host = wallet.network === 'mainnet' ? 'api.hiro.so' : 'api.testnet.hiro.so';
 
-  // Build vault rules
   const rules: VaultRule[] = [];
   let allocatedPct = 0;
 
-  // Parse splits
+  // Parse splits with BNS support
   if (options.split && options.split.length > 0) {
     for (const s of options.split) {
-      const [address, pct] = s.split(':');
-      if (!address || !pct) {
-        console.error(chalk.red(`❌ Invalid split: "${s}" — use ADDRESS:PERCENTAGE`));
+      const lastColon = s.lastIndexOf(':');
+      if (lastColon === -1) {
+        console.error(chalk.red(`❌ Invalid split: "${s}" — use ADDRESS:PCT or name.btc:PCT`));
         return;
       }
+      const nameOrAddr = s.slice(0, lastColon);
+      const pct = s.slice(lastColon + 1);
       const percentage = parseFloat(pct);
-      rules.push({ type: 'split', address, percentage });
+      if (isNaN(percentage) || percentage <= 0 || percentage > 100) {
+        console.error(chalk.red(`❌ Invalid percentage in "${s}"`));
+        return;
+      }
+      const resolved = await resolveBNS(nameOrAddr);
+      if (resolved.isBNS) {
+        console.log(chalk.green(`  ✅ BNS: ${resolved.name} → ${resolved.address}`));
+      }
+      rules.push({
+        type: 'split',
+        address: resolved.address,
+        name: resolved.name,        // ← now works
+        percentage,
+      });
       allocatedPct += percentage;
     }
   }
@@ -163,8 +173,8 @@ export async function vaultCommand(options: {
   }
 
   // Parse lock
-  let lockBlocks = 0;
   if (options.lock) {
+    let lockBlocks: number;
     try {
       lockBlocks = parseDuration(options.lock);
     } catch (err: any) {
@@ -183,10 +193,9 @@ export async function vaultCommand(options: {
     allocatedPct += lockPct;
   }
 
-  // Remaining goes to owner
   const ownerPct = 100 - allocatedPct;
   if (ownerPct < 0) {
-    console.error(chalk.red(` Allocations exceed 100% (got ${allocatedPct}%)`));
+    console.error(chalk.red(`❌ Allocations exceed 100% (got ${allocatedPct}%)`));
     return;
   }
 
@@ -198,7 +207,6 @@ export async function vaultCommand(options: {
 
   let vaultState = loadVaultState();
 
-  // Vault status endpoint (free)
   app.get('/', (_req, res) => {
     res.json({
       name: options.description || 'stackspay vault',
@@ -211,6 +219,7 @@ export async function vaultCommand(options: {
         rules: rules.map(r => ({
           type: r.type,
           percentage: r.percentage,
+          ...(r.name && { name: r.name }),
           ...(r.address && { address: r.address }),
           ...(r.unlockBlock && { unlockBlock: r.unlockBlock, unlockDate: r.unlockDate }),
         })),
@@ -220,7 +229,6 @@ export async function vaultCommand(options: {
     });
   });
 
-  // Vault stats endpoint
   app.get('/vault', (_req, res) => {
     res.json({
       address: wallet.address,
@@ -247,20 +255,17 @@ export async function vaultCommand(options: {
       const payment = getPayment(req);
       const input = req.body;
 
-      console.log(chalk.green(`\n Payment received — executing vault rules`));
+      console.log(chalk.green(`\n⚡ Payment received — executing vault rules`));
       console.log(chalk.gray(`   From   : ${payment?.payer || 'unknown'}`));
       console.log(chalk.gray(`   Amount : ${options.price} ${token}`));
       console.log(chalk.gray(`   TX     : ${payment?.transaction || 'pending'}`));
 
-      // Execute command first
       const cmdWithInput = typeof input === 'string' && input
         ? `echo '${input.replace(/'/g, "'\\''")}' | ${options.cmd}`
         : options.cmd;
 
-      exec(cmdWithInput, { timeout: 30000 }, async (error, stdout, stderr) => {
-        if (error) {
-          return res.status(500).json({ success: false, error: error.message });
-        }
+      exec(cmdWithInput, { timeout: 30000 }, async (error, stdout) => {
+        if (error) return res.status(500).json({ success: false, error: error.message });
 
         const output = stdout.trim();
         console.log(chalk.cyan(`   Output : ${output}`));
@@ -272,7 +277,6 @@ export async function vaultCommand(options: {
           splits: [] as any[],
         };
 
-        // Send response immediately
         res.json({
           success: true,
           output,
@@ -286,62 +290,52 @@ export async function vaultCommand(options: {
               type: r.type,
               percentage: r.percentage,
               amount: `${(priceFloat * r.percentage / 100).toFixed(6)} STX`,
-              ...(r.address && { to: r.address }),
+              ...(r.name && { to: r.name }),
+              ...(r.address && !r.name && { to: r.address }),
               ...(r.unlockBlock && { unlocksAt: r.unlockDate }),
             })),
             ownerShare: `${(priceFloat * ownerPct / 100).toFixed(6)} STX`,
           },
         });
 
-        // Execute vault rules in background
         console.log(chalk.yellow(`\n   Executing vault rules...`));
 
         for (const rule of rules) {
           const ruleAmount = BigInt(Math.floor(Number(totalAmount) * rule.percentage / 100));
           const ruleSTX = (Number(ruleAmount) / 1_000_000).toFixed(6);
+          const displayTo = rule.name || (rule.address ? rule.address.slice(0, 16) + '...' : '');
 
           if (rule.type === 'split' && rule.address) {
             try {
-              const txid = await sendSTX(
-                wallet.privateKey,
-                rule.address,
-                ruleAmount,
-                wallet.network,
-                `x402:split`
-              );
-              console.log(chalk.green(`    SPLIT: ${ruleSTX} STX → ${rule.address.slice(0, 16)}... (${rule.percentage}%)`));
+              const txid = await sendSTX(wallet.privateKey, rule.address, ruleAmount, wallet.network, 'x402:split');
+              console.log(chalk.green(`   ✅ SPLIT: ${ruleSTX} STX → ${displayTo} (${rule.percentage}%)`));
               console.log(chalk.blue(`      TX: https://explorer.hiro.so/txid/${txid}?chain=${wallet.network}`));
               vaultState.totalSplit += Number(ruleAmount) / 1_000_000;
-              paymentRecord.splits.push({ type: 'split', to: rule.address, amount: ruleSTX, txid });
+              paymentRecord.splits.push({ type: 'split', to: displayTo, amount: ruleSTX, txid });
             } catch (err: any) {
-              console.log(chalk.red(`    Split failed: ${err.message}`));
+              console.log(chalk.red(`   ❌ Split failed → ${displayTo}: ${err.message}`));
             }
-
           } else if (rule.type === 'lock') {
-            console.log(chalk.magenta(`    LOCK: ${ruleSTX} STX locked until block #${rule.unlockBlock}`));
+            console.log(chalk.magenta(`   🔒 LOCK: ${ruleSTX} STX until block #${rule.unlockBlock}`));
             console.log(chalk.magenta(`      Unlocks: ${rule.unlockDate}`));
             vaultState.totalLocked += Number(ruleAmount) / 1_000_000;
             paymentRecord.splits.push({ type: 'lock', amount: ruleSTX, unlockBlock: rule.unlockBlock });
-
           } else if (rule.type === 'reserve') {
-            console.log(chalk.cyan(`   RESERVE: ${ruleSTX} STX saved (${rule.percentage}%)`));
+            console.log(chalk.cyan(`   💰 RESERVE: ${ruleSTX} STX saved (${rule.percentage}%)`));
             vaultState.totalReserve += Number(ruleAmount) / 1_000_000;
             paymentRecord.splits.push({ type: 'reserve', amount: ruleSTX });
           }
         }
 
-        const ownerAmount = (priceFloat * ownerPct / 100).toFixed(6);
         if (ownerPct > 0) {
-          console.log(chalk.green(`   💵 OWNER: ${ownerAmount} STX → you (${ownerPct}%)`));
+          console.log(chalk.green(`   💵 OWNER: ${(priceFloat * ownerPct / 100).toFixed(6)} STX → you (${ownerPct}%)`));
         }
 
         vaultState.totalReceived += priceFloat;
         vaultState.payments.unshift(paymentRecord);
         if (vaultState.payments.length > 50) vaultState.payments = vaultState.payments.slice(0, 50);
         saveVaultState(vaultState);
-
-        console.log(chalk.bold(''));
-        console.log(chalk.bold.green(`   Vault total received: ${vaultState.totalReceived.toFixed(6)} STX`));
+        console.log(chalk.bold.green(`\n   Vault total received: ${vaultState.totalReceived.toFixed(6)} STX`));
       });
     }
   );
@@ -349,7 +343,7 @@ export async function vaultCommand(options: {
   app.listen(port, () => {
     console.log('');
     console.log(chalk.bold('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-    console.log(chalk.bold.green('   stackspay — Programmable Payment Vault'));
+    console.log(chalk.bold.green('  🏦 stackspay — Programmable Payment Vault'));
     console.log(chalk.bold('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
     console.log(chalk.cyan('  Command  :'), chalk.white(options.cmd));
     console.log(chalk.cyan('  Price    :'), chalk.green.bold(`${options.price} ${token}`));
@@ -357,28 +351,25 @@ export async function vaultCommand(options: {
     console.log(chalk.cyan('  Network  :'), chalk.white(wallet.network));
     console.log('');
     console.log(chalk.bold.yellow('  Vault Rules:'));
-
     rules.forEach(r => {
       const amt = (priceFloat * r.percentage / 100).toFixed(6);
+      const display = r.name || r.address || '';
       if (r.type === 'split') {
-        console.log(chalk.gray(`      SPLIT   ${r.percentage}% (${amt} STX) → ${r.address}`));
+        console.log(chalk.gray(`      SPLIT   ${r.percentage}% (${amt} STX) → ${display}`));
       } else if (r.type === 'lock') {
         console.log(chalk.gray(`     LOCK    ${r.percentage}% (${amt} STX) until ${r.unlockDate}`));
       } else if (r.type === 'reserve') {
         console.log(chalk.gray(`     RESERVE ${r.percentage}% (${amt} STX) saved`));
       }
     });
-
     if (ownerPct > 0) {
       console.log(chalk.gray(`     OWNER   ${ownerPct}% (${(priceFloat * ownerPct / 100).toFixed(6)} STX) → you`));
     }
-
     console.log(chalk.bold('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
     console.log('');
     console.log(chalk.yellow('  To call this service:'));
-    console.log(chalk.gray(`  stackspay pay http://localhost:${port}/run`));
-    console.log('');
-    console.log(chalk.gray('  Vault stats: http://localhost:${port}/vault'));
+    console.log(chalk.gray(`  npm run dev -- pay http://localhost:${port}/run`));
+    console.log(chalk.gray(`  Vault stats: http://localhost:${port}/vault`));
     console.log(chalk.gray('  Waiting for payments... Press Ctrl+C to stop'));
   });
 }

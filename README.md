@@ -1,4 +1,8 @@
-# stackspay
+# Stackspay
+
+<img width="931" height="207" alt="image" src="https://github.com/user-attachments/assets/31ce9bf2-7e58-4216-88ff-3e294e7a0e92" />
+
+
 
 > Monetize any CLI script with x402-stacks in 30 seconds. Powered by Bitcoin.
 

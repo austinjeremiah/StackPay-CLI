@@ -10,6 +10,7 @@ import { payCommand } from './commands/pay';
 import { watchCommand } from './commands/watch';
 import { requestCommand } from './commands/request';
 import { splitCommand } from './commands/split';
+import { vaultCommand } from './commands/vault';
 
 const program = new Command();
 
@@ -84,6 +85,19 @@ program
   .description('Show payment history received by your wallet')
   .option('-l, --limit <n>', 'Number of payments to show', '10')
   .action((opts) => historyCommand(opts));
+
+program
+  .command('vault')
+  .description('Programmable payment vault — split, lock, and reserve earnings automatically')
+  .requiredOption('--cmd <command>', 'Command to execute on payment')
+  .requiredOption('--price <amount>', 'Price per call in STX')
+  .option('--token <token>', 'Token to accept (STX)', 'STX')
+  .option('--port <port>', 'Port to listen on', '3000')
+  .option('--split <address:pct>', 'Split % to address (ADDRESS:PERCENTAGE)', (v, acc: string[]) => [...acc, v], [])
+  .option('--lock <duration>', 'Lock % of earnings for duration (e.g. 7d, 24h, 30m)')
+  .option('--reserve <percentage>', 'Reserve % of earnings in wallet')
+  .option('--description <desc>', 'Service description')
+  .action((opts) => vaultCommand(opts));
 
 program
   .command('proxy')

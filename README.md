@@ -631,6 +631,77 @@ Fetches the transaction history for the local wallet address from the Stacks API
 
 ---
 
+## Demo 10 — AI Agent Economy (Autonomous Negotiation)
+
+stackspay includes a full agent-to-agent payment protocol. AI agents can autonomously discover services, negotiate prices, and pay — all without human involvement.
+
+### Start an agent service with negotiation enabled
+```bash
+# Terminal 1
+stackspay agent \
+  --cmd "echo Intel delivered!" \
+  --price 0.005 \
+  --min 0.001 \
+  --negotiate \
+  --capabilities "data,blockchain,realtime"
+```
+
+### Agent pays at listed price
+```bash
+# Terminal 2
+stackspay agent-pay http://localhost:3000/run
+```
+
+### Agent negotiates autonomously (starts at 70% of listed price)
+```bash
+# Terminal 2
+stackspay agent-pay http://localhost:3000/run --negotiate
+```
+
+### Agent opens with a low-ball offer (triggers counter-offer flow)
+```bash
+# Terminal 2
+stackspay agent-pay http://localhost:3000/run --negotiate --offer 0.0005
+```
+
+The negotiation output looks like this:
+```
+Negotiation round 1
+  Offering  : 0.0005 STX
+  Counter   : 0.001 STX
+
+Negotiation round 2
+  Offering  : 0.00075 STX
+  Accepted  : 0.001 STX
+
+Deal agreed: 0.001 STX
+Agent Payment Complete
+  TX      : 348ea955...
+  Explorer: https://explorer.hiro.so/txid/348ea955...
+```
+
+### Agent service options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--cmd` | Command to execute on payment (required) | |
+| `--price` | Listed price in STX (required) | |
+| `--min` | Minimum acceptable price (sets negotiation floor) | 50% of listed |
+| `--negotiate` | Enable autonomous price negotiation | false |
+| `--capabilities` | Comma-separated capability tags | data,compute,analysis |
+| `--port` | Port to listen on | 3000 |
+
+### Agent pay options
+
+| Flag | Description |
+|------|-------------|
+| `--negotiate` | Attempt price negotiation before paying |
+| `--offer` | Initial offer price in STX |
+| `--agent-id` | Custom agent identifier |
+| `--data` | JSON data to send with request |
+| `--file` | Send file contents as request body |
+| `--raw` | Print raw response |
+
 ## Real-World Use Cases
 
 ### AI API Monetization

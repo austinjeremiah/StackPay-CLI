@@ -1,6 +1,6 @@
 {
   "name": "@austinjeremiah/stackspay",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Monetize any CLI script with x402-stacks in 30 seconds. Powered by Bitcoin.",
   "main": "dist/index.js",
   "bin": {
@@ -53,12 +53,14 @@
     "commander": "^14.0.3",
     "dotenv": "^17.3.1",
     "express": "^4.22.1",
+    "node-fetch": "^3.3.2",
     "ora": "^9.3.0",
     "x402-stacks": "^2.0.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.3",
+    "@types/node-fetch": "^2.6.13",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

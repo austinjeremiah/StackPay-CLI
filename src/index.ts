@@ -11,6 +11,8 @@ import { watchCommand } from './commands/watch';
 import { requestCommand } from './commands/request';
 import { splitCommand } from './commands/split';
 import { vaultCommand } from './commands/vault';
+import { agentCommand } from './commands/agent';
+import { agentPayCommand } from './commands/agentpay';
 
 const program = new Command();
 
@@ -165,6 +167,44 @@ program
   .addHelpText('after', `
 ${chalk.bold('Examples:')}
   ${chalk.cyan('$ stackspay vault --cmd "echo hi" --price 0.003 --split muneeb.id:30 --reserve 10 --lock 1h')}
+`);
+
+// ─── agent ───────────────────────────────────────────────────────────────────
+program
+  .command('agent')
+  .description('Start an AI agent-ready service with optional price negotiation')
+  .requiredOption('--cmd <command>', 'Command to execute on payment')
+  .requiredOption('--price <amount>', 'Listed price in STX')
+  .option('--min <amount>', 'Minimum acceptable price (enables negotiation floor)')
+  .option('--negotiate', 'Enable autonomous price negotiation', false)
+  .option('--token <token>', 'Token (STX)', 'STX')
+  .option('--port <port>', 'Port to listen on', '3000')
+  .option('--capabilities <list>', 'Comma-separated capability tags', 'data,compute,analysis')
+  .option('--description <desc>', 'Service description')
+  .action((opts) => agentCommand(opts))
+  .addHelpText('after', `
+${chalk.bold('Examples:')}
+  ${chalk.cyan('$ stackspay agent --cmd "python get_data.py" --price 0.005 --min 0.001 --negotiate')}
+  ${chalk.cyan('$ stackspay agent --cmd "echo hello" --price 0.001 --capabilities "data,weather,realtime"')}
+`);
+
+// ─── agent-pay ───────────────────────────────────────────────────────────────
+program
+  .command('agent-pay')
+  .description('Autonomously discover, negotiate, and pay for an agent service')
+  .argument('<url>', 'Agent service URL')
+  .option('--negotiate', 'Attempt price negotiation before paying', false)
+  .option('--offer <amount>', 'Initial offer price in STX')
+  .option('--agent-id <id>', 'Custom agent identifier')
+  .option('--data <json>', 'JSON data to send')
+  .option('--file <path>', 'Send file contents')
+  .option('--raw', 'Print raw response')
+  .action((url, opts) => agentPayCommand(url, opts))
+  .addHelpText('after', `
+${chalk.bold('Examples:')}
+  ${chalk.cyan('$ stackspay agent-pay http://localhost:3000/run')}
+  ${chalk.cyan('$ stackspay agent-pay http://localhost:3000/run --negotiate')}
+  ${chalk.cyan('$ stackspay agent-pay http://localhost:3000/run --negotiate --offer 0.002')}
 `);
 
 // ─── fallback ─────────────────────────────────────────────────────────────────

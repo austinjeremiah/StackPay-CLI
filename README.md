@@ -6,7 +6,7 @@
 
 > Monetize any CLI script with x402-stacks in 30 seconds. Powered by Bitcoin.
 
-stackspay is a terminal-native x402 payment toolkit for the Stacks blockchain. Any developer can wrap any script, command, binary, or upstream HTTP API behind an HTTP 402 paywall and start earning STX or sBTC — with zero frontend, zero database, and zero infrastructure. Revenue distribution, vault locking, BNS name resolution, multi-party splits, and a live dashboard are all built in.
+stackspay is a terminal-native x402 payment toolkit for the Stacks blockchain. Any developer can wrap any script, command, binary, or upstream HTTP API behind an HTTP 402 paywall and start earning STX or sBTC — with zero frontend, zero database, and zero infrastructure. Revenue distribution, vault locking, BNS name resolution, multi-party splits, Autonomous Negotiation , moltbots and a live dashboard are all built in.
 
 Built for the [x402 Stacks Challenge](https://x402stacks.xyz) 
 

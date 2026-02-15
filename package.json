@@ -1,6 +1,6 @@
 {
   "name": "@austinjeremiah/stackspay",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Monetize any CLI script with x402-stacks in 30 seconds. Powered by Bitcoin.",
   "main": "dist/index.js",
   "bin": {
